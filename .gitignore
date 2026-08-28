@@ -1,0 +1,6 @@
+node_modules
+out
+dist
+userData
+.DS_Store
+*.log
