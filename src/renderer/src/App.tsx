@@ -34,6 +34,12 @@ function eventToAccelerator(e: KeyboardEvent): string | null {
   if (mods.length) return [...mods, key].join('+')
   return key
 }
+function vkToDisplay(code?: number, fallback?: string): string {
+  if (fallback && !/^VC_/.test(fallback) && fallback !== String(code)) return fallback
+  const map: Record<number,string> = {1:'Escape',2:'1',3:'2',4:'3',5:'4',6:'5',7:'6',8:'7',9:'8',10:'9',11:'0',12:'Minus',13:'Equal',14:'Backspace',15:'Tab',16:'Q',17:'W',18:'E',19:'R',20:'T',21:'Y',22:'U',23:'I',24:'O',25:'P',26:'BracketLeft',27:'BracketRight',28:'Enter',29:'ControlLeft',30:'A',31:'S',32:'D',33:'F',34:'G',35:'H',36:'J',37:'K',38:'L',39:'Semicolon',40:'Quote',41:'Backquote',42:'ShiftLeft',43:'Backslash',44:'Z',45:'X',46:'C',47:'V',48:'B',49:'N',50:'M',51:'Comma',52:'Period',53:'Slash',54:'ShiftRight',55:'NumpadMultiply',56:'AltLeft',57:'Space',58:'CapsLock',59:'F1',60:'F2',61:'F3',62:'F4',63:'F5',64:'F6',65:'F7',66:'F8',67:'F9',68:'F10',69:'NumLock',70:'ScrollLock',71:'Home',72:'ArrowUp',73:'PageUp',74:'NumpadSubtract',75:'ArrowLeft',76:'Numpad5',77:'ArrowRight',78:'NumpadAdd',79:'End',80:'ArrowDown',81:'PageDown',82:'Insert',83:'Delete',87:'F11',88:'F12',3613:'ControlRight',3640:'AltRight'}
+  if (code && map[code]) return map[code]
+  return fallback || (code ? `Code ${code}` : '')
+}
 
 function ShortcutInput({ value, onSave, disabled }: { value?: string, onSave: (s: string|undefined)=>void, disabled?: boolean }){
   const [recording, setRecording] = useState(false)
@@ -74,7 +80,7 @@ function ShortcutInput({ value, onSave, disabled }: { value?: string, onSave: (s
               if(acc) setDraft(acc)
             }
           }}
-          style={{flex:1, background: recording ? '#1a1f2e' : 'var(--panel2)', border:`1px solid ${recording ? 'var(--accent)' : 'var(--border)'}`, color:'var(--text)', padding:'7px 9px', borderRadius:8, outline:'none', fontSize:12}}
+          style={{flex:1, background: recording ? 'rgba(0,184,148,0.18)' : 'var(--panel2)', border:`1px solid ${recording ? '#00b894' : 'var(--border)'}`, boxShadow: recording ? '0 0 0 2px rgba(0,184,148,0.25), 0 0 12px rgba(0,184,148,0.2)' : 'none', color: recording ? '#7bf0c0' : 'var(--text)', padding:'7px 9px', borderRadius:8, outline:'none', fontSize:12, transition:'all .15s'}}
           disabled={disabled}
         />
         <button className="btn small" disabled={disabled} onClick={async()=>{
@@ -91,7 +97,7 @@ function ShortcutInput({ value, onSave, disabled }: { value?: string, onSave: (s
           try{ await api().setShortcut((window as any)._selectedId, undefined); onSave(undefined); setDraft('') }catch(err:any){ setError(err.message)}
         }}>Clear</button>
       </div>
-      {recording && <span className="muted" style={{fontSize:11}}>Press keys now (e.g. Ctrl+Shift+Q or F6). Click Set to confirm.</span>}
+      {recording && <span style={{fontSize:11, color:'#00b894', display:'flex', gap:6, alignItems:'center'}}><span className="record-dot" style={{width:8,height:8, background:'#00b894', boxShadow:'0 0 8px rgba(0,184,148,.8)'}}/> Recording — press keys now (e.g. Ctrl+Shift+Q or F6). Click Set to confirm.</span>}
       {error && <span style={{color:'#ff7675',fontSize:11}}>{error}</span>}
       {value && <span className="muted" style={{fontSize:11}}>Active: <span className="kbd">{value}</span> — works globally even when app is in background/tray.</span>}
     </div>
@@ -372,6 +378,8 @@ export default function App(){
                   {filteredEvents.length===0 && <div className="empty">No events yet. Press <b>Record</b> and perform your actions — they appear here live.<br/><span className="muted">Tip: edit the <b>Delay (ms)</b> column to fine-tune timing.</span></div>}
                   {filteredEvents.map((ev, idx)=>{
                     const isPlaying = playing && playProgress?.idx===selected.events.indexOf(ev)
+                    const keyLabel = vkToDisplay(ev.keycode, ev.key)
+                    const btnLabel = ev.button===2 ? 'Right' : ev.button===3 ? 'Middle' : ev.button===4 ? 'Button4' : ev.button===5 ? 'Button5' : 'Left'
                     return (
                       <div key={ev.id} className={`event-row ${isPlaying?'playing':''}`} draggable onDragStart={()=> setDragIdx(idx)} onDragOver={e=> e.preventDefault()} onDrop={()=>{
                         if(dragIdx===null||dragIdx===idx) return
@@ -382,12 +390,12 @@ export default function App(){
                       }}>
                         <span className="idx">#{String(idx+1).padStart(3,'0')}</span>
                         <span className={`tag ${ev.type}`}>{ev.type}</span>
-                        <span className="muted" style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                          {ev.type.includes('key') ? `keycode ${ev.keycode} ${ev.key||''}` : ''}
-                          {ev.type.includes('mouse') ? `btn ${ev.button??1} @ ${ev.x},${ev.y}` : ''}
-                          {ev.type==='mousemove' ? `@ ${ev.x},${ev.y}` : ''}
-                          {ev.type==='wheel' ? `Δ ${ev.deltaY}` : ''}
-                          {ev.type==='delay' ? '— pause —' : ''}
+                        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap', display:'flex', gap:6, alignItems:'center'}}>
+                          {ev.type.includes('key') ? <><span className="kbd" style={{background: ev.type==='keydown' ? '#2c2610' : '#1a1a1a', color: ev.type==='keydown' ? '#facc15' : '#fde68a', borderColor:'#3a3000', fontWeight:700}}>{keyLabel}</span><span className="muted" style={{fontSize:10}}>code {ev.keycode}</span></> : null}
+                          {ev.type==='mousedown' || ev.type==='mouseup' ? <><span className="kbd" style={{background:'#0f2e26', color:'#7bf0c0', borderColor:'#1a4a3a'}}>{btnLabel} Click</span><span className="muted" style={{fontSize:10}}>@ {ev.x},{ev.y}</span></> : null}
+                          {ev.type==='mousemove' ? <span className="muted">Move @ {ev.x},{ev.y}</span> : null}
+                          {ev.type==='wheel' ? <span className="muted">Wheel Δ {ev.deltaY ?? ev.deltaX}</span> : null}
+                          {ev.type==='delay' ? <span className="muted">— pause —</span> : null}
                         </span>
                         <input className="delay-input" type="number" min={0} step={10} value={ev.delay} onChange={e=> updateEventDelay(idx, parseInt(e.target.value)||0)} title="Delay after previous event (ms)"/>
                         <span className="muted" style={{fontVariantNumeric:'tabular-nums'}}>{(ev.delay/1000).toFixed(3)}s</span>

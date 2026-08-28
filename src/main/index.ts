@@ -116,9 +116,23 @@ function updateTrayMenu() {
   ]))
 }
 
+// single instance - avoid second process double tray
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+}
+
 app.whenReady().then(() => {
+  if (!gotLock) return
   macros = loadMacros()
-  // migrate: ensure fields exist
   macros = macros.map(m => ({ shortcut: undefined, runInBackground: false, ...m }))
   console.log(`[main] loaded ${macros.length} macros`)
 
@@ -155,7 +169,10 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', () => { isQuitting = true })
+app.on('before-quit', () => {
+  isQuitting = true
+  if (tray) { try { tray.destroy() } catch {} tray = null }
+})
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 function playMacroById(id: string) {

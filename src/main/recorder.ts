@@ -106,12 +106,13 @@ export class MacroRecorder {
     const delay = Math.max(0, now - this.lastTime)
     this.lastTime = now
 
+    const keyName = raw.keycode ? vkToKey(raw.keycode) : undefined
     const ev: MacroEvent = {
       id: randomUUID(),
       type: type as any,
       delay,
       keycode: raw.keycode,
-      key: raw.keycode ? String(raw.keycode) : undefined,
+      key: keyName || (raw.keycode ? `VC_${raw.keycode}` : undefined),
       button: raw.button,
       x: raw.x,
       y: raw.y,
@@ -123,12 +124,31 @@ export class MacroRecorder {
     // Normalize button
     if (ev.button === undefined && raw.button !== undefined) ev.button = raw.button
 
-    // Try to get key name if available
-    if (raw.keycode && !ev.key) ev.key = `VC_${raw.keycode}`
+    // Ensure key name is human-readable
+    if (raw.keycode && (!ev.key || /^VC_/.test(ev.key))) {
+      ev.key = vkToKey(raw.keycode) || `VC_${raw.keycode}`
+    }
 
     this.events.push(ev)
     this.onEventCb?.(ev)
   }
+}
+
+function vkToKey(code: number): string | undefined {
+  const map: Record<number,string> = {
+    1:'Escape',2:'1',3:'2',4:'3',5:'4',6:'5',7:'6',8:'7',9:'8',10:'9',11:'0',
+    12:'Minus',13:'Equal',14:'Backspace',15:'Tab',16:'Q',17:'W',18:'E',19:'R',20:'T',21:'Y',22:'U',23:'I',24:'O',25:'P',
+    26:'BracketLeft',27:'BracketRight',28:'Enter',29:'ControlLeft',30:'A',31:'S',32:'D',33:'F',34:'G',35:'H',36:'J',37:'K',38:'L',
+    39:'Semicolon',40:'Quote',41:'Backquote',42:'ShiftLeft',43:'Backslash',44:'Z',45:'X',46:'C',47:'V',48:'B',49:'N',50:'M',
+    51:'Comma',52:'Period',53:'Slash',54:'ShiftRight',55:'NumpadMultiply',56:'AltLeft',57:'Space',58:'CapsLock',
+    59:'F1',60:'F2',61:'F3',62:'F4',63:'F5',64:'F6',65:'F7',66:'F8',67:'F9',68:'F10',69:'NumLock',70:'ScrollLock',
+    71:'Home',72:'ArrowUp',73:'PageUp',74:'NumpadSubtract',75:'ArrowLeft',76:'Numpad5',77:'ArrowRight',78:'NumpadAdd',
+    79:'End',80:'ArrowDown',81:'PageDown',82:'Insert',83:'Delete',87:'F11',88:'F12',
+    3613:'ControlRight',3640:'AltRight',3657:'ContextMenu',3639:'MetaLeft',3641:'MetaRight'
+  }
+  if (map[code]) return map[code]
+  if (code >= 59 && code <= 68) return `F${code-58}`
+  return undefined
 }
 
 export const recorder = new MacroRecorder()
