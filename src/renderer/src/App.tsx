@@ -241,7 +241,7 @@ export default function App(){
     <>
       <div className="titlebar">
         <div style={{display:'flex',gap:10,alignItems:'center'}}>
-          <div style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,#6c5ce7,#00cec9)'}}/>
+          <div style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,#facc15,#eab308)'}}/>
           <strong style={{fontSize:13}}>Universal Macro</strong>
           <span className="badge">v1.0 • {caps?.platform || ''}</span>
           {settings.runInBackground && <span className="badge" style={{background:'#153a2a',color:'#7bf0c0',borderColor:'#1d5a3a'}}>● Background</span>}

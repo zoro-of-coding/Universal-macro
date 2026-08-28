@@ -32,7 +32,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 600,
     title: 'Universal Macro',
-    backgroundColor: '#0f1115',
+    backgroundColor: '#0a0a0a',
     titleBarStyle: 'hiddenInset',
     autoHideMenuBar: true,
     show: false,
@@ -74,11 +74,11 @@ function createWindow() {
 }
 
 function createTray() {
+  if (tray) return // singleton - prevent double tray on HMR / recreate
   try {
     const iconPath = getIconPath()
     let img = nativeImage.createFromPath(iconPath)
     if (img.isEmpty()) {
-      // fallback: 16x16 generated
       img = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAHUlEQVR42mNkYGD4z0AFZCCKgDEwEsYBaNgFIyAAAZwQAQpU3OIAAAAASUVORK5CYII=')
     }
     tray = new Tray(img)
