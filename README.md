@@ -13,9 +13,9 @@
 
 *Clean, fast, yellow & black — built to stay out of your way.*
 
-[![Electron](https://img.shields.io/badge/Electron-32-black?style=flat-square&logo=electron&logoColor=#facc15)]()
-[![Platform](https://img.shields.io/badge/Windows-macOS-Linux-black?style=flat-square)]()
-[![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)]()
+[![Electron](https://img.shields.io/badge/Electron-32-47848F?style=flat-square&logo=electron&logoColor=white)]()
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)]()
+[![License](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)]()
 
 [Download](#-download--run) • [How to Use](#-how-to-use-in-3-steps) • [Shortcuts](#-shortcuts)
 
