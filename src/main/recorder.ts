@@ -149,9 +149,12 @@ export class MacroRecorder {
     // Never record the hotkey that started recording (F9 up right after start) or other control F-keys shortly after start
     if ((type === 'keydown' || type === 'keyup') && raw.keycode && this.hotkeyKeycodes.has(raw.keycode)) {
       if (Date.now() - this.recordStartTime < 600) {
-        // console.log('[recorder] ignore hotkey shortly after start', raw.keycode)
         return
       }
+    }
+    // Ignore mouse clicks from the Record button itself for a short window after start
+    if ((type === 'mousedown' || type === 'mouseup' || type === 'mousemove') && Date.now() - this.recordStartTime < 350) {
+      return
     }
 
     // throttle mousemove heavily (at most 20Hz and distance > 5px)

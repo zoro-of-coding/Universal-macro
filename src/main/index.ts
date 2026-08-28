@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell, Tray, Menu, nativeImage, screen } from 'electron'
 import { join } from 'path'
 import { existsSync, writeFileSync, readFileSync } from 'fs'
 import { recorder } from './recorder'
@@ -8,6 +8,7 @@ import type { Macro } from './types'
 import { randomUUID } from 'crypto'
 
 let mainWindow: BrowserWindow | null = null
+let overlayWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let macros: Macro[] = []
 let settings = loadSettings()
@@ -91,6 +92,66 @@ function createTray() {
   } catch (e) { console.warn('tray failed', e) }
 }
 
+function createRecordOverlay() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) return
+  try {
+    const primary = screen.getPrimaryDisplay()
+    const { width } = primary.workAreaSize
+    const W = 190, H = 48
+    overlayWindow = new BrowserWindow({
+      width: W,
+      height: H,
+      x: Math.max(0, width - W - 16),
+      y: 16,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      hasShadow: true,
+      focusable: true,
+      show: false,
+      icon: getIconPath(),
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    })
+    overlayWindow.setVisibleOnAllWorkspaces(true)
+    overlayWindow.setAlwaysOnTop(true, 'screen-saver' as any)
+    // hide menu
+    overlayWindow.setMenu(null)
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+      *{box-sizing:border-box}html,body{margin:0;background:transparent;font-family:Inter,system-ui,Arial}
+      .wrap{width:190px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent}
+      button{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#ff2e2e,#cc0000);color:white;border:1px solid #ff5555;padding:10px 18px;border-radius:999px;font-weight:800;font-size:13px;letter-spacing:.3px;cursor:pointer;box-shadow:0 8px 28px rgba(255,0,0,.45),0 2px 8px rgba(0,0,0,.5);transition:.15s}
+      button:hover{transform:scale(1.03);box-shadow:0 10px 32px rgba(255,0,0,.55)}
+      .dot{width:10px;height:10px;background:white;border-radius:50%;box-shadow:0 0 0 4px rgba(255,255,255,.25);animation:pulse 1s infinite}
+      @keyframes pulse{0%{box-shadow:0 0 0 4px rgba(255,255,255,.25)}50%{box-shadow:0 0 0 7px rgba(255,255,255,.15)}100%{box-shadow:0 0 0 4px rgba(255,255,255,.25)}}
+      .time{font-size:11px;color:#ffd1d1;margin-left:4px;font-weight:600}
+    </style></head><body><div class="wrap"><button id="stop"><span class="dot"></span> Stop <span class="time" id="t">● REC</span></button></div>
+    <script>
+      const btn=document.getElementById('stop');
+      const t=document.getElementById('t');
+      let s=0; setInterval(()=>{s++; const m=String(Math.floor(s/60)).padStart(2,'0'); const sc=String(s%60).padStart(2,'0'); t.textContent=m+':'+sc; },1000);
+      btn.onclick=()=>{ try{ window.api && window.api.recorderStop().then(()=> window.api.windowShow()); }catch(e){} };
+      // also listen for Esc to stop
+      window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ btn.click(); }});
+    </script></body></html>`
+    overlayWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
+    overlayWindow.once('ready-to-show', () => overlayWindow?.show())
+    overlayWindow.on('closed', () => { overlayWindow = null })
+  } catch (e) { console.warn('overlay failed', e) }
+}
+function destroyRecordOverlay() {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    try { overlayWindow.close() } catch {}
+    overlayWindow = null
+  }
+}
+
 function updateTrayMenu() {
   if (!tray) return
   const macroItems = macros.slice(0, 10).map(m => ({
@@ -146,10 +207,30 @@ app.whenReady().then(() => {
     try { app.setLoginItemSettings({ openAtLogin: true }) } catch {}
   }
 
-  // recorder callbacks -> push to renderer
+  // recorder callbacks -> push to renderer + overlay/minimize
   recorder.setCallbacks(
     (ev) => mainWindow?.webContents.send('recorder:event', ev),
-    (recording) => mainWindow?.webContents.send('recorder:state', recording)
+    (recording) => {
+      mainWindow?.webContents.send('recorder:state', recording)
+      if (recording) {
+        // minimize main window and show small stop overlay at top-right
+        try {
+          if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized()) {
+            mainWindow.minimize()
+          }
+        } catch {}
+        createRecordOverlay()
+      } else {
+        destroyRecordOverlay()
+        try {
+          if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore()
+            mainWindow.show()
+            mainWindow.focus()
+          }
+        } catch {}
+      }
+    }
   )
   player.setCallbacks(
     (idx, repeat) => mainWindow?.webContents.send('player:progress', { idx, repeat }),
@@ -172,6 +253,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  destroyRecordOverlay()
   if (tray) { try { tray.destroy() } catch {} tray = null }
 })
 app.on('will-quit', () => globalShortcut.unregisterAll())
