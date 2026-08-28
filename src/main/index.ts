@@ -138,6 +138,7 @@ app.whenReady().then(() => {
 
   createWindow()
   createTray()
+  try { recorder.setHotkeyAccelerators([settings.hotkeys.record, settings.hotkeys.stop, settings.hotkeys.play]) } catch {}
   registerHotkeys()
 
   // apply launch at startup
@@ -227,6 +228,11 @@ function registerHotkeys() {
       } catch (e:any){ errors.push(`${m.name}: ${e.message}`)}
     }
   } catch (e) { console.warn('hotkey register failed', e) }
+  // update recorder ignore list so F9 etc not captured as macro steps
+  try {
+    const allAccels = [settings.hotkeys.record, settings.hotkeys.play, settings.hotkeys.stop, ...macros.map(m=>m.shortcut).filter(Boolean) as string[]]
+    recorder.setHotkeyAccelerators(allAccels)
+  } catch {}
   if (errors.length) console.warn('[hotkeys] errors', errors)
   return errors
 }
@@ -408,6 +414,7 @@ ipcMain.handle('settings:get', () => settings)
 ipcMain.handle('settings:set', (_e, s) => {
   settings = { ...settings, ...s }
   saveSettings(settings)
+  try { recorder.setHotkeyAccelerators([settings.hotkeys.record, settings.hotkeys.stop, settings.hotkeys.play]) } catch {}
   // apply login item
   try { app.setLoginItemSettings({ openAtLogin: !!settings.launchAtStartup }) } catch {}
   registerHotkeys()

@@ -18,11 +18,15 @@ export class MacroRecorder {
   private events: MacroEvent[] = []
   private isRecording = false
   private lastTime = 0
+  private recordStartTime = 0
   private captureMouseMove = false
   private captureKeyboard = true
   private captureMouseClick = true
   private onEventCb?: (e: MacroEvent) => void
   private onStateCb?: (recording: boolean) => void
+  // hotkeys that trigger record/stop - never record their own press (F9/F10/F11)
+  private hotkeyKeycodes = new Set([67, 68, 87, 88, 59, 60, 61, 62, 63, 64, 65, 66]) // F1-F12
+  private recordHotkeyCodes = new Set([67]) // F9 specifically, extend if needed
 
   constructor() {
     if (uiohook) {
@@ -49,6 +53,7 @@ export class MacroRecorder {
     this.captureMouseClick = opts.captureMouseClick
     this.events = []
     this.lastTime = Date.now()
+    this.recordStartTime = Date.now()
     this.isRecording = true
     if (uiohook && !hookAvailable) {
       // try reload
@@ -65,6 +70,28 @@ export class MacroRecorder {
     this.isRecording = false
     if (uiohook) {
       try { uiohook.stop() } catch {}
+    }
+    // Remove trailing hotkey press that triggered STOP (F9 down/up) if it's the last event
+    // and also leading hotkey release that triggered START (F9 up at 0ms)
+    if (this.events.length) {
+      const first = this.events[0]
+      if (first && first.type.includes('key') && first.keycode && this.recordHotkeyCodes.has(first.keycode) && first.delay < 300) {
+        // F9 up right after start - drop it
+        this.events.shift()
+        console.log('[recorder] filtered leading F9')
+      }
+      const last = this.events[this.events.length - 1]
+      if (last && last.type.includes('key') && last.keycode && this.hotkeyKeycodes.has(last.keycode)) {
+        // If stop was triggered by F9/F10, ensure we don't keep that key as last step
+        // Check if last event is within short time before stop (delay already set)
+        // Pop it if it's a hotkey
+        const isStopHotkey = this.recordHotkeyCodes.has(last.keycode) || this.hotkeyKeycodes.has(last.keycode)
+        if (isStopHotkey) {
+          // Only pop if last event is very recent (we assume stop press is last)
+          this.events.pop()
+          console.log('[recorder] filtered trailing hotkey', last.key)
+        }
+      }
     }
     this.onStateCb?.(false)
     console.log('[recorder] stopped, events:', this.events.length)
@@ -85,12 +112,47 @@ export class MacroRecorder {
     this.onEventCb?.(full)
   }
 
+  // Allow main to update hotkey codes dynamically
+  setHotkeyKeycodes(codes: number[]) {
+    this.recordHotkeyCodes = new Set(codes)
+    this.hotkeyKeycodes = new Set([...codes, 68, 87]) // also F10/F11
+  }
+  setHotkeyAccelerators(accelerators: string[]) {
+    const codes: number[] = []
+    for (const acc of accelerators) {
+      const c = this.acceleratorToKeycode(acc)
+      if (c) codes.push(c)
+    }
+    if (codes.length) this.setHotkeyKeycodes(codes)
+  }
+  private acceleratorToKeycode(acc: string): number | null {
+    if (!acc) return null
+    const last = acc.split('+').pop()?.trim().toUpperCase()
+    if (!last) return null
+    const fMap: Record<string, number> = {
+      'F1':59,'F2':60,'F3':61,'F4':62,'F5':63,'F6':64,'F7':65,'F8':66,'F9':67,'F10':68,'F11':87,'F12':88,
+      'ESCAPE':1,'SPACE':57,'ENTER':28,'TAB':15,'BACKSPACE':14,'DELETE':83,'INSERT':82
+    }
+    if (fMap[last]) return fMap[last]
+    if (/^[A-Z]$/.test(last)) return 30 + (last.charCodeAt(0) - 65) // approximate A=30 etc not exact but covers letter keys
+    if (/^[0-9]$/.test(last)) return last==='0' ? 11 : 2 + parseInt(last)-1
+    return null
+  }
+
   private handleRaw(type: string, raw: any) {
     if (!this.isRecording) return
     // filter by capture settings
     if (type === 'mousemove' && !this.captureMouseMove) return
     if ((type === 'keydown' || type === 'keyup') && !this.captureKeyboard) return
     if ((type === 'mousedown' || type === 'mouseup' || type === 'wheel') && !this.captureMouseClick) return
+
+    // Never record the hotkey that started recording (F9 up right after start) or other control F-keys shortly after start
+    if ((type === 'keydown' || type === 'keyup') && raw.keycode && this.hotkeyKeycodes.has(raw.keycode)) {
+      if (Date.now() - this.recordStartTime < 600) {
+        // console.log('[recorder] ignore hotkey shortly after start', raw.keycode)
+        return
+      }
+    }
 
     // throttle mousemove heavily (at most 20Hz and distance > 5px)
     if (type === 'mousemove') {
