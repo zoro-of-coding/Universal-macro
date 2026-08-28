@@ -27,6 +27,7 @@ export class MacroRecorder {
   // hotkeys that trigger record/stop - never record their own press (F9/F10/F11)
   private hotkeyKeycodes = new Set([67, 68, 87, 88, 59, 60, 61, 62, 63, 64, 65, 66]) // F1-F12
   private recordHotkeyCodes = new Set([67]) // F9 specifically, extend if needed
+  private overlayRect: { x:number, y:number, w:number, h:number } | null = null
 
   constructor() {
     if (uiohook) {
@@ -80,16 +81,21 @@ export class MacroRecorder {
         this.events.shift()
         console.log('[recorder] filtered leading F9')
       }
-      const last = this.events[this.events.length - 1]
+      let last = this.events[this.events.length - 1]
       if (last && last.type.includes('key') && last.keycode && this.hotkeyKeycodes.has(last.keycode)) {
-        // If stop was triggered by F9/F10, ensure we don't keep that key as last step
-        // Check if last event is within short time before stop (delay already set)
-        // Pop it if it's a hotkey
         const isStopHotkey = this.recordHotkeyCodes.has(last.keycode) || this.hotkeyKeycodes.has(last.keycode)
         if (isStopHotkey) {
-          // Only pop if last event is very recent (we assume stop press is last)
           this.events.pop()
           console.log('[recorder] filtered trailing hotkey', last.key)
+          last = this.events[this.events.length - 1]
+        }
+      }
+      // Also filter trailing Stop-overlay click (mouse at overlay rect)
+      if (last && (last.type === 'mousedown' || last.type === 'mouseup') && this.overlayRect && last.x !== undefined && last.y !== undefined) {
+        const r = this.overlayRect
+        if (last.x >= r.x && last.x <= r.x + r.w && last.y >= r.y && last.y <= r.y + r.h) {
+          this.events.pop()
+          console.log('[recorder] filtered trailing overlay click')
         }
       }
     }
@@ -125,6 +131,10 @@ export class MacroRecorder {
     }
     if (codes.length) this.setHotkeyKeycodes(codes)
   }
+  setOverlayRect(rect: { x:number, y:number, w:number, h:number } | null) {
+    this.overlayRect = rect
+  }
+
   private acceleratorToKeycode(acc: string): number | null {
     if (!acc) return null
     const last = acc.split('+').pop()?.trim().toUpperCase()
@@ -155,6 +165,13 @@ export class MacroRecorder {
     // Ignore mouse clicks from the Record button itself for a short window after start
     if ((type === 'mousedown' || type === 'mouseup' || type === 'mousemove') && Date.now() - this.recordStartTime < 350) {
       return
+    }
+    // Ignore clicks on the floating Stop overlay (top-right 190x48)
+    if ((type === 'mousedown' || type === 'mouseup') && this.overlayRect && raw.x !== undefined && raw.y !== undefined) {
+      const r = this.overlayRect
+      if (raw.x >= r.x && raw.x <= r.x + r.w && raw.y >= r.y && raw.y <= r.y + r.h) {
+        return
+      }
     }
 
     // throttle mousemove heavily (at most 20Hz and distance > 5px)

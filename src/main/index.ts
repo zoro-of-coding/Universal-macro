@@ -121,6 +121,8 @@ function createRecordOverlay() {
     })
     overlayWindow.setVisibleOnAllWorkspaces(true)
     overlayWindow.setAlwaysOnTop(true, 'screen-saver' as any)
+    // tell recorder to ignore clicks inside overlay bounds
+    try { recorder.setOverlayRect({ x: Math.max(0, width - W - 16), y: 16, w: W, h: H }) } catch {}
     // hide menu
     overlayWindow.setMenu(null)
     const html = `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -146,6 +148,7 @@ function createRecordOverlay() {
   } catch (e) { console.warn('overlay failed', e) }
 }
 function destroyRecordOverlay() {
+  try { recorder.setOverlayRect(null) } catch {}
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     try { overlayWindow.close() } catch {}
     overlayWindow = null
