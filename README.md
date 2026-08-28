@@ -13,8 +13,8 @@
 
 *Clean, fast, yellow & black — built to stay out of your way.*
 
+[![Windows](https://img.shields.io/badge/Windows-Only-0078D4?style=flat-square&logo=windows&logoColor=white)]()
 [![Electron](https://img.shields.io/badge/Electron-32-47848F?style=flat-square&logo=electron&logoColor=white)]()
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)]()
 [![License](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)]()
 
 [Download](#-download--run) • [How to Use](#-how-to-use-in-3-steps) • [Shortcuts](#-shortcuts)
@@ -112,21 +112,29 @@ Right-click the **tray icon** (bottom-right near the clock) to **Show, Run any m
 
 ---
 
-### 📥 Download & Run
+### 📥 Download & Run — Windows Only
 
-**Quick start for everyone:**
+> ⚠️ Works on **Windows 10 / 11 (64-bit)** only.
 
-1. Download from Releases (or get the `dist/win-unpacked` folder after building)
-2. Double-click **`Universal Macro.exe`** — no install needed for the portable version
-3. Done. Create your first macro.
+**For everyone — use the setup:**
+
+1. Go to **Releases** and download **`Universal Macro Setup 1.0.0.exe`** (84 MB)
+2. Double-click it → Choose where to install → Click **Install**
+3. Open **Universal Macro** from Start Menu or Desktop → Create your first macro
+
+*No setup hassle — installer adds it to Start Menu and you can uninstall anytime from Settings → Apps.*
+
+**Portable (no install):**
+Unzip `dist/win-unpacked` and run **`Universal Macro.exe`** directly.
 
 **For developers:**
 
 ```bash
 npm install
-npm run dev      # run with hot reload
-npm run build    # make the app
-npm run package  # make the portable exe in dist/win-unpacked
+npm run dev          # run with hot reload
+npm run build        # make the app
+npm run package      # portable exe in dist/win-unpacked
+npm run make:win     # setup exe in dist/Universal Macro Setup 1.0.0.exe
 ```
 
 Your macros are saved automatically on your computer — safe and offline.
